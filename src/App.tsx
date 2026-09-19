@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, HelpCircle, Trophy, Sparkles, AlertCircle, Eye, RefreshCw, ChevronRight } from 'lucide-react';
+import { BookOpen, HelpCircle, Trophy, Sparkles, AlertCircle, Eye, RefreshCw, ChevronRight, Sun, Moon } from 'lucide-react';
 import { LEVELS, type WordEntry } from './data/levels';
 import { toGeezNumber } from './utils/geez';
 import { normalizeAmharic, getLetterPoints } from './utils/amharic';
@@ -19,6 +19,9 @@ export function App() {
   const [score, setScore] = React.useState(0);
   const [tokens, setTokens] = React.useState(15); // Start with 15 tokens
   const [completedLevels, setCompletedLevels] = React.useState<number[]>([]);
+
+  // Theme state: 'night' (default) or 'day'
+  const [themeMode, setThemeMode] = React.useState<'night' | 'day'>('night');
 
   // Modals & UI states
   const [showRulesModal, setShowRulesModal] = React.useState(false);
@@ -41,6 +44,19 @@ export function App() {
     }));
     setRackTiles(levelRack);
   }, [currentLevelIdx, currentLevel]);
+
+  // Set of all active (playable word) cell keys in current level grid
+  const activeCells = React.useMemo(() => {
+    const set = new Set<string>();
+    currentLevel.words.forEach((w: WordEntry) => {
+      for (let i = 0; i < w.word.length; i++) {
+        const r = w.direction === 'across' ? w.startRow : w.startRow + i;
+        const c = w.direction === 'across' ? w.startCol + i : w.startCol;
+        set.add(`${r}-${c}`);
+      }
+    });
+    return set;
+  }, [currentLevel]);
 
   // Compute cell clue numbers and starting positions
   const wordMap = React.useMemo(() => {
@@ -150,9 +166,9 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1c1712] text-[#f3f0e6] flex flex-col font-sans border-t-4 border-emerald-500">
+    <div className={`min-h-screen flex flex-col font-sans border-t-4 border-emerald-500 mode-${themeMode}`}>
       {/* Top Navigation Header */}
-      <header className="bg-[#2a2219] border-b border-[#3d3226] px-4 py-3 flex flex-wrap items-center justify-between shadow-md">
+      <header className="app-header px-4 py-3 flex flex-wrap items-center justify-between shadow-md border-b relative z-20">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-lg bg-gradient-to-tr from-emerald-600 via-amber-500 to-red-600 flex items-center justify-center font-bold text-xl text-white shadow">
             ስ
@@ -177,9 +193,28 @@ export function App() {
             <span>ቶከን: {toGeezNumber(tokens)} ({tokens})</span>
           </div>
 
+          {/* Day / Night Theme Toggle Button */}
+          <button
+            onClick={() => setThemeMode((prev) => (prev === 'night' ? 'day' : 'night'))}
+            className="flex items-center space-x-1 bg-amber-600/20 hover:bg-amber-600/30 text-amber-500 text-xs px-3 py-1.5 rounded-lg border border-amber-600/40 transition cursor-pointer font-semibold"
+            title="ቀን / ማታ ይቀይሩ (Toggle Day / Night Mode)"
+          >
+            {themeMode === 'night' ? (
+              <>
+                <Sun className="w-4 h-4 text-amber-400" />
+                <span>ቀን (Day)</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-4 h-4 text-amber-700" />
+                <span>ማታ (Night)</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={() => setShowRulesModal(true)}
-            className="flex items-center space-x-1 bg-[#3a3024] hover:bg-[#4a3e30] text-[#d4c5b3] text-xs px-3 py-1.5 rounded-lg border border-[#524435] transition cursor-pointer"
+            className="flex items-center space-x-1 bg-amber-900/30 hover:bg-amber-800/40 text-amber-200 text-xs px-3 py-1.5 rounded-lg border border-amber-700/40 transition cursor-pointer"
           >
             <HelpCircle className="w-4 h-4" />
             <span>ሕጎች (Rules)</span>
@@ -194,14 +229,14 @@ export function App() {
         <section className="md:col-span-7 flex flex-col items-center space-y-4">
 
           {/* Level Header Bar */}
-          <div className="w-full flex items-center justify-between bg-[#2a2219] p-3 rounded-xl border border-[#3d3226]">
+          <div className="w-full flex items-center justify-between card-bg p-3 rounded-xl border">
             <div>
               <span className="text-xs text-amber-500 font-semibold uppercase tracking-wider">የአሁኑ ደረጃ</span>
-              <h2 className="text-lg font-bold text-amber-100">{currentLevel.title}</h2>
+              <h2 className="text-lg font-bold">{currentLevel.title}</h2>
             </div>
             <button
               onClick={handleResetLevel}
-              className="p-2 bg-[#382d21] hover:bg-[#4a3b2b] rounded-lg text-amber-200 transition cursor-pointer"
+              className="p-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-500 rounded-lg transition cursor-pointer"
               title="እንደገና ጀምር (Reset Level)"
             >
               <RefreshCw className="w-4 h-4" />
@@ -218,33 +253,44 @@ export function App() {
 
           {/* Scrabble Grid */}
           <div
-            className="grid gap-1 bg-[#282119] p-3 rounded-2xl border-2 border-[#473a2c] shadow-2xl tibeb-pattern-bg"
+            className="grid gap-1 board-bg p-3 rounded-2xl border-2 shadow-2xl"
             style={{
               gridTemplateColumns: `repeat(${currentLevel.gridSize}, minmax(0, 1fr))`,
               width: '100%',
-              maxWidth: '420px',
+              maxWidth: '440px',
               aspectRatio: '1/1'
             }}
           >
             {Array.from({ length: currentLevel.gridSize }).map((_, r) =>
               Array.from({ length: currentLevel.gridSize }).map((_, c) => {
                 const cellKey = `${r}-${c}`;
+                const isActive = activeCells.has(cellKey);
                 const char = gridState[cellKey];
                 const startInfo = wordMap[cellKey];
+
+                if (!isActive) {
+                  return (
+                    <div
+                      key={cellKey}
+                      className="wooden-wall-block rounded-lg aspect-square w-full h-full"
+                      aria-hidden="true"
+                    />
+                  );
+                }
 
                 return (
                   <button
                     key={cellKey}
                     onClick={() => handleCellClick(r, c)}
-                    className={`relative rounded-lg flex items-center justify-center font-bold text-xl transition-all duration-150 select-none ${
+                    className={`relative rounded-lg flex items-center justify-center font-bold text-xl transition-all duration-150 select-none aspect-square w-full h-full p-0 overflow-hidden ${
                       char
-                        ? 'wood-tile shadow-md cursor-pointer scale-95'
-                        : 'bg-[#1b1611]/80 hover:bg-[#34291e] border border-[#382c1f] text-[#8c7a68]'
+                        ? 'wood-tile shadow-md cursor-pointer'
+                        : 'empty-cell border'
                     }`}
                   >
                     {/* Ge'ez Clue Number Badge */}
                     {startInfo && (
-                      <span className="absolute top-0.5 left-1 text-[10px] text-amber-600 font-semibold leading-none">
+                      <span className="absolute top-0.5 left-1 text-[13px] text-amber-400 font-extrabold leading-none z-10 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] opacity-100">
                         {toGeezNumber(startInfo.clueNum)}
                       </span>
                     )}
@@ -265,8 +311,8 @@ export function App() {
           </div>
 
           {/* Tile Rack */}
-          <div className="w-full bg-[#2a2219] p-4 rounded-xl border border-[#3d3226] shadow-lg flex flex-col items-center space-y-2">
-            <span className="text-xs text-[#a89a8b] font-medium">የፊደላት ሳጥን (Tile Rack) - ለማስቀመጥ ጠቅ ያድርጉ</span>
+          <div className="w-full card-bg p-4 rounded-xl border shadow-lg flex flex-col items-center space-y-2">
+            <span className="text-xs opacity-80 font-medium">የፊደላት ሳጥን (Tile Rack) - ለማስቀመጥ ጠቅ ያድርጉ</span>
             <div className="flex flex-wrap justify-center gap-2">
               {rackTiles.map((tile, idx) => {
                 const isSelected = selectedRackTile?.index === idx;
@@ -296,15 +342,15 @@ export function App() {
         <section className="md:col-span-5 flex flex-col space-y-4">
 
           {/* Definitions / Clues Card */}
-          <div className="bg-[#2a2219] rounded-xl border border-[#3d3226] p-4 shadow-lg flex-1 flex flex-col">
-            <div className="flex items-center justify-between border-b border-[#3d3226] pb-2 mb-3">
-              <div className="flex items-center space-x-2 text-amber-300 font-semibold">
-                <BookOpen className="w-5 h-5 text-amber-400" />
+          <div className="card-bg rounded-xl border p-4 shadow-lg flex-1 flex flex-col">
+            <div className="flex items-center justify-between border-b border-amber-800/30 pb-2 mb-3">
+              <div className="flex items-center space-x-2 text-amber-500 font-semibold">
+                <BookOpen className="w-5 h-5 text-amber-500" />
                 <span>ጥቆማዎችና ትርጓሜዎች (Clues)</span>
               </div>
             </div>
 
-            <div className="space-y-4 overflow-y-auto max-h-[400px] pr-1">
+            <div className="space-y-3 overflow-y-auto max-h-[400px] pr-1">
               {currentLevel.words.map((w: WordEntry) => {
                 const isSolved = checkWordSolved(w, gridState);
                 const startCellKey = `${w.startRow}-${w.startCol}`;
@@ -315,8 +361,8 @@ export function App() {
                     key={w.id}
                     className={`p-3 rounded-lg border transition ${
                       isSolved
-                        ? 'bg-emerald-950/40 border-emerald-600/50 text-emerald-200'
-                        : 'bg-[#1e1812] border-[#382d21] text-[#dcd2c5]'
+                        ? 'bg-emerald-900/30 border-emerald-600/50 text-emerald-400'
+                        : 'clue-card'
                     }`}
                   >
                     <div className="flex items-start justify-between">
@@ -358,8 +404,8 @@ export function App() {
           </div>
 
           {/* Level Switcher */}
-          <div className="bg-[#2a2219] p-3 rounded-xl border border-[#3d3226] flex items-center justify-between">
-            <span className="text-xs text-[#a89a8b]">ደረጃዎች (Levels)</span>
+          <div className="card-bg p-3 rounded-xl border flex items-center justify-between">
+            <span className="text-xs opacity-80 font-medium">ደረጃዎች (Levels)</span>
             <div className="flex space-x-2">
               {LEVELS.map((lvl, idx: number) => (
                 <button
@@ -367,8 +413,8 @@ export function App() {
                   onClick={() => setCurrentLevelIdx(idx)}
                   className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
                     currentLevelIdx === idx
-                      ? 'bg-amber-600 text-white'
-                      : 'bg-[#1b1611] text-[#9c8b79] hover:bg-[#33281d]'
+                      ? 'bg-amber-600 text-white shadow'
+                      : 'stat-badge border text-amber-500 hover:bg-amber-600/20'
                   }`}
                 >
                   {toGeezNumber(lvl.levelNumber)}
@@ -383,29 +429,29 @@ export function App() {
       {/* Rules Modal */}
       {showRulesModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-[#241d16] border-2 border-amber-600/60 rounded-2xl max-w-md w-full p-6 text-[#f3f0e6] shadow-2xl relative">
+          <div className="card-bg border-2 border-amber-600/60 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
             <h3 className="text-xl font-bold ethiopian-text-gradient mb-3">
               የአማርኛ ስክራብል ሕጎች (Game Rules)
             </h3>
 
-            <div className="space-y-3 text-sm text-[#d1c4b4] leading-relaxed max-h-[60vh] overflow-y-auto pr-1">
-              <div className="bg-[#1b1611] p-3 rounded-lg border border-[#3a2f22]">
-                <h4 className="font-bold text-amber-400 mb-1">፩. የድምፅ ተመሳስሎ አጠቃቀም (Homophone Normalization)</h4>
+            <div className="space-y-3 text-sm opacity-90 leading-relaxed max-h-[60vh] overflow-y-auto pr-1">
+              <div className="clue-card p-3 rounded-lg border">
+                <h4 className="font-bold text-amber-500 mb-1">፩. የድምፅ ተመሳስሎ አጠቃቀም (Homophone Normalization)</h4>
                 <p className="text-xs">
                   በአማርኛ ፊደላት ተመሳሳይ ድምፅ ያላቸው (ለምሳሌ፡ ሠ እና ሰ፣ ሀ እና ሐ እና ኀ) እንደ አንድ ፊደል ይቆጠራሉ።
                   በመሆኑም "ሠላም" ለሚለው ቃል "ሰላም" ብለው ቢያስገቡ ጨዋታው እንደ ትክክለኛ መልስ ይቀበለዋል።
                 </p>
               </div>
 
-              <div className="bg-[#1b1611] p-3 rounded-lg border border-[#3a2f22]">
-                <h4 className="font-bold text-amber-400 mb-1">፪. የግዕዝ ቁጥሮች (Ge'ez Numerals)</h4>
+              <div className="clue-card p-3 rounded-lg border">
+                <h4 className="font-bold text-amber-500 mb-1">፪. የግዕዝ ቁጥሮች (Ge'ez Numerals)</h4>
                 <p className="text-xs">
                   የጨዋታው ነጥቦች፣ የቶከን ብዛት እና ጥቆማዎች በግዕዝ ቁጥሮች (፩, ፪, ፫, ፬...) ይገለጻሉ።
                 </p>
               </div>
 
-              <div className="bg-[#1b1611] p-3 rounded-lg border border-[#3a2f22]">
-                <h4 className="font-bold text-amber-400 mb-1">፫. ጥቆማዎች እና ቶከን (Hints & Tokens)</h4>
+              <div className="clue-card p-3 rounded-lg border">
+                <h4 className="font-bold text-amber-500 mb-1">፫. ጥቆማዎች እና ቶከን (Hints & Tokens)</h4>
                 <p className="text-xs">
                   ቃላትን ማግኘት ካልቻሉ ፭ ቶከን በመጠቀም መልሱን ማየት ይችላሉ። ደረጃዎችን ሲያጠናቅቁ ተጨማሪ ቶከን ያገኛሉ።
                 </p>
@@ -425,21 +471,21 @@ export function App() {
       {/* Level Success Modal */}
       {showLevelSuccessModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-[#241d16] border-2 border-emerald-500 rounded-2xl max-w-md w-full p-6 text-center text-[#f3f0e6] shadow-2xl">
+          <div className="card-bg border-2 border-emerald-500 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl">
             <Trophy className="w-16 h-16 text-amber-400 mx-auto mb-3 animate-bounce" />
             <h3 className="text-2xl font-extrabold text-emerald-400 mb-1">እንኳን ደስ አለዎት!</h3>
-            <p className="text-[#c7b8a7] text-sm mb-4">
+            <p className="opacity-80 text-sm mb-4">
               ደረጃ {toGeezNumber(currentLevel.levelNumber)}ን በተሳካ ሁኔታ አጠናቀዋል!
             </p>
 
-            <div className="bg-[#19140e] p-3 rounded-xl border border-[#33281c] mb-5 flex justify-around">
+            <div className="clue-card p-3 rounded-xl border mb-5 flex justify-around">
               <div>
-                <span className="text-xs text-[#a39382]">የተገኘ ነጥብ</span>
-                <p className="text-xl font-bold text-amber-400">+{toGeezNumber(currentLevel.targetScore)}</p>
+                <span className="text-xs opacity-80">የተገኘ ነጥብ</span>
+                <p className="text-xl font-bold text-amber-500">+{toGeezNumber(currentLevel.targetScore)}</p>
               </div>
               <div>
-                <span className="text-xs text-[#a39382]">የተበረከተ ቶከን</span>
-                <p className="text-xl font-bold text-emerald-400">+፲ (10)</p>
+                <span className="text-xs opacity-80">የተበረከተ ቶከን</span>
+                <p className="text-xl font-bold text-emerald-500">+፲ (10)</p>
               </div>
             </div>
 
