@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #1a1612;
+    color: #f3f0e6;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    min-height: 100vh;
+    margin: 0;
+  }
+}
+
+/* Custom Tibeb Pattern Border */
+.tibeb-border {
+  border-image: linear-gradient(90deg, #10b981 0%, #eab308 50%, #ef4444 100%) 1;
+}
+
+.tibeb-pattern-bg {
+  background-color: #241e17;
+  background-image: radial-gradient(#3a3024 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+.wood-tile {
+  background: linear-gradient(135deg, #f7e1b5 0%, #d4a359 100%);
+  border: 2px solid #8b5a2b;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  color: #3d2208;
+}
+
+.wood-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.wood-tile-placed {
+  background: linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 100%);
+  border: 2px solid #475569;
+  color: #0f172a;
+}
+
+.wood-tile-correct {
+  background: linear-gradient(135deg, #dcfce7 0%, #86efac 100%);
+  border: 2px solid #166534;
+  color: #14532d;
+}
+
+/* Ethiopian Gradient Text */
+.ethiopian-text-gradient {
+  background: linear-gradient(90deg, #10b981 0%, #f59e0b 50%, #ef4444 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
