@@ -1,13 +1,18 @@
 import React from 'react';
-import { BookOpen, HelpCircle, Trophy, Sparkles, AlertCircle, Eye, RefreshCw, ChevronRight, Sun, Moon } from 'lucide-react';
-import { LEVELS, type WordEntry } from './data/levels';
+import { BookOpen, HelpCircle, Trophy, Sparkles, AlertCircle, Eye, RefreshCw, ChevronRight, Sun, Moon, Code } from 'lucide-react';
+import { LEVELS, type WordEntry, type LevelConfig } from './data/levels';
 import { toGeezNumber } from './utils/geez';
 import { normalizeAmharic, getLetterPoints } from './utils/amharic';
+import { LevelEditor } from './components/LevelEditor';
 import confetti from 'canvas-confetti';
 
 export function App() {
+  const [levelList, setLevelList] = React.useState<LevelConfig[]>(LEVELS);
   const [currentLevelIdx, setCurrentLevelIdx] = React.useState(0);
-  const currentLevel = LEVELS[currentLevelIdx];
+  const currentLevel = levelList[currentLevelIdx] || levelList[0];
+
+  // Dev Mode toggle state
+  const [devMode, setDevMode] = React.useState<boolean>(false);
 
   // Board grid representation: (row, col) -> char string
   const [gridState, setGridState] = React.useState<Record<string, string>>({});
@@ -33,6 +38,7 @@ export function App() {
 
   // Initialize level
   React.useEffect(() => {
+    if (!currentLevel) return;
     const initialGrid: Record<string, string> = {};
     setGridState(initialGrid);
     setSelectedRackTile(null);
@@ -47,6 +53,7 @@ export function App() {
 
   // Compute cell clue numbers and starting positions
   const wordMap = React.useMemo(() => {
+    if (!currentLevel) return {};
     const map: Record<string, { clueNum: number; words: WordEntry[] }> = {};
     let clueCounter = 1;
 
@@ -159,6 +166,22 @@ export function App() {
     setRackTiles(levelRack);
   };
 
+  // Play test custom built level from Dev Mode
+  const handlePlayTestCustomLevel = (customLevel: LevelConfig) => {
+    // Check if level already exists or add to list
+    const existingIdx = levelList.findIndex((l) => l.levelNumber === customLevel.levelNumber);
+    if (existingIdx >= 0) {
+      const updatedList = [...levelList];
+      updatedList[existingIdx] = customLevel;
+      setLevelList(updatedList);
+      setCurrentLevelIdx(existingIdx);
+    } else {
+      setLevelList((prev) => [...prev, customLevel]);
+      setCurrentLevelIdx(levelList.length);
+    }
+    setDevMode(false);
+  };
+
   return (
     <div className={`min-h-screen flex flex-col font-sans border-t-4 border-emerald-500 mode-${themeMode}`}>
       {/* Top Navigation Header */}
@@ -177,15 +200,33 @@ export function App() {
 
         {/* Stats & Actions */}
         <div className="flex items-center space-x-4 mt-2 sm:mt-0">
-          <div className="flex items-center space-x-1.5 bg-[#17130e] px-3 py-1.5 rounded-full border border-[#3d3226] text-amber-400 font-medium text-sm">
-            <Trophy className="w-4 h-4" />
-            <span>ነጥብ: {toGeezNumber(score)} ({score})</span>
-          </div>
+          {!devMode && (
+            <>
+              <div className="flex items-center space-x-1.5 bg-[#17130e] px-3 py-1.5 rounded-full border border-[#3d3226] text-amber-400 font-medium text-sm">
+                <Trophy className="w-4 h-4" />
+                <span>ነጥብ: {toGeezNumber(score)} ({score})</span>
+              </div>
 
-          <div className="flex items-center space-x-1.5 bg-[#17130e] px-3 py-1.5 rounded-full border border-[#3d3226] text-emerald-400 font-medium text-sm">
-            <Sparkles className="w-4 h-4" />
-            <span>ቶከን: {toGeezNumber(tokens)} ({tokens})</span>
-          </div>
+              <div className="flex items-center space-x-1.5 bg-[#17130e] px-3 py-1.5 rounded-full border border-[#3d3226] text-emerald-400 font-medium text-sm">
+                <Sparkles className="w-4 h-4" />
+                <span>ቶከን: {toGeezNumber(tokens)} ({tokens})</span>
+              </div>
+            </>
+          )}
+
+          {/* Dev Mode Toggle Button */}
+          <button
+            onClick={() => setDevMode((prev) => !prev)}
+            className={`flex items-center space-x-1 text-xs px-3 py-1.5 rounded-lg border transition cursor-pointer font-bold ${
+              devMode
+                ? 'bg-amber-500 text-amber-950 border-amber-300 shadow-md'
+                : 'bg-emerald-900/30 text-emerald-300 border-emerald-700/50 hover:bg-emerald-800/40'
+            }`}
+            title="Dev Mode: Level & Word Builder"
+          >
+            <Code className="w-4 h-4" />
+            <span>{devMode ? 'ወደ ጨዋታው ተመለስ (Game)' : 'የሰሪው ሁነታ (Dev Mode)'}</span>
+          </button>
 
           {/* Day / Night Theme Toggle Button */}
           <button
@@ -206,208 +247,216 @@ export function App() {
             )}
           </button>
 
-          <button
-            onClick={() => setShowRulesModal(true)}
-            className="flex items-center space-x-1 bg-amber-900/30 hover:bg-amber-800/40 text-amber-200 text-xs px-3 py-1.5 rounded-lg border border-amber-700/40 transition cursor-pointer"
-          >
-            <HelpCircle className="w-4 h-4" />
-            <span>ሕጎች (Rules)</span>
-          </button>
+          {!devMode && (
+            <button
+              onClick={() => setShowRulesModal(true)}
+              className="flex items-center space-x-1 bg-amber-900/30 hover:bg-amber-800/40 text-amber-200 text-xs px-3 py-1.5 rounded-lg border border-amber-700/40 transition cursor-pointer"
+            >
+              <HelpCircle className="w-4 h-4" />
+              <span>ሕጎች (Rules)</span>
+            </button>
+          )}
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4 grid grid-cols-1 md:grid-cols-12 gap-6">
+      {devMode ? (
+        <main className="flex-1 max-w-6xl w-full mx-auto p-4">
+          <LevelEditor onPlayTestLevel={handlePlayTestCustomLevel} />
+        </main>
+      ) : (
+        <main className="flex-1 max-w-6xl w-full mx-auto p-4 grid grid-cols-1 md:grid-cols-12 gap-6">
 
-        {/* Left Column: Game Board & Rack */}
-        <section className="md:col-span-7 flex flex-col items-center space-y-4">
+          {/* Left Column: Game Board & Rack */}
+          <section className="md:col-span-7 flex flex-col items-center space-y-4">
 
-          {/* Level Header Bar */}
-          <div className="w-full flex items-center justify-between card-bg p-3 rounded-xl border">
-            <div>
-              <span className="text-xs text-amber-500 font-semibold uppercase tracking-wider">የአሁኑ ደረጃ</span>
-              <h2 className="text-lg font-bold">{currentLevel.title}</h2>
+            {/* Level Header Bar */}
+            <div className="w-full flex items-center justify-between card-bg p-3 rounded-xl border">
+              <div>
+                <span className="text-xs text-amber-500 font-semibold uppercase tracking-wider">የአሁኑ ደረጃ</span>
+                <h2 className="text-lg font-bold">{currentLevel.title}</h2>
+              </div>
+              <button
+                onClick={handleResetLevel}
+                className="p-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-500 rounded-lg transition cursor-pointer"
+                title="እንደገና ጀምር (Reset Level)"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
             </div>
-            <button
-              onClick={handleResetLevel}
-              className="p-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-500 rounded-lg transition cursor-pointer"
-              title="እንደገና ጀምር (Reset Level)"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
 
-          {/* Status Message */}
-          {statusMessage && (
-            <div className="w-full bg-amber-900/60 border border-amber-600 text-amber-200 text-xs px-3 py-2 rounded-lg flex items-center space-x-2 animate-fade-in">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
-              <span>{statusMessage}</span>
-            </div>
-          )}
-
-          {/* Scrabble Grid */}
-          <div
-            className="grid gap-1 board-bg p-3 rounded-2xl border-2 shadow-2xl"
-            style={{
-              gridTemplateColumns: `repeat(${currentLevel.gridSize}, minmax(0, 1fr))`,
-              width: '100%',
-              maxWidth: '440px',
-              aspectRatio: '1/1'
-            }}
-          >
-            {Array.from({ length: currentLevel.gridSize }).map((_, r) =>
-              Array.from({ length: currentLevel.gridSize }).map((_, c) => {
-                const cellKey = `${r}-${c}`;
-                const char = gridState[cellKey];
-                const startInfo = wordMap[cellKey];
-
-                return (
-                  <button
-                    key={cellKey}
-                    onClick={() => handleCellClick(r, c)}
-                    className={`relative rounded-lg flex items-center justify-center font-bold text-xl transition-all duration-150 select-none aspect-square w-full h-full p-0 overflow-hidden ${
-                      char
-                        ? 'wood-tile shadow-md cursor-pointer'
-                        : 'empty-cell border cursor-pointer'
-                    }`}
-                  >
-                    {/* Ge'ez Clue Number Badge */}
-                    {startInfo && (
-                      <span className="absolute top-0.5 left-1 text-[13px] text-amber-400 font-extrabold leading-none z-10 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] opacity-100">
-                        {toGeezNumber(startInfo.clueNum)}
-                      </span>
-                    )}
-
-                    {/* Placed Character */}
-                    {char && <span>{char}</span>}
-
-                    {/* Subscript Points */}
-                    {char && (
-                      <span className="absolute bottom-0.5 right-1 text-[9px] text-[#5c3a17] font-semibold">
-                        {getLetterPoints(char)}
-                      </span>
-                    )}
-                  </button>
-                );
-              })
+            {/* Status Message */}
+            {statusMessage && (
+              <div className="w-full bg-amber-900/60 border border-amber-600 text-amber-200 text-xs px-3 py-2 rounded-lg flex items-center space-x-2 animate-fade-in">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+                <span>{statusMessage}</span>
+              </div>
             )}
-          </div>
 
-          {/* Tile Rack */}
-          <div className="w-full card-bg p-4 rounded-xl border shadow-lg flex flex-col items-center space-y-2">
-            <span className="text-xs opacity-80 font-medium">የፊደላት ሳጥን (Tile Rack) - ለማስቀመጥ ጠቅ ያድርጉ</span>
-            <div className="flex flex-wrap justify-center gap-2">
-              {rackTiles.map((tile, idx) => {
-                const isSelected = selectedRackTile?.index === idx;
-                return (
-                  <button
-                    key={tile.id}
-                    onClick={() =>
-                      setSelectedRackTile(isSelected ? null : { char: tile.char, index: idx })
-                    }
-                    className={`w-11 h-11 wood-tile rounded-lg font-bold text-xl flex items-center justify-center relative transition transform cursor-pointer ${
-                      isSelected ? 'ring-4 ring-amber-400 -translate-y-2 scale-105' : 'hover:-translate-y-1'
-                    }`}
-                  >
-                    <span>{tile.char}</span>
-                    <span className="absolute bottom-0.5 right-1 text-[9px] text-[#5c3a17]">
-                      {getLetterPoints(tile.char)}
-                    </span>
-                  </button>
-                );
-              })}
+            {/* Scrabble Grid */}
+            <div
+              className="grid gap-1 board-bg p-3 rounded-2xl border-2 shadow-2xl"
+              style={{
+                gridTemplateColumns: `repeat(${currentLevel.gridSize}, minmax(0, 1fr))`,
+                width: '100%',
+                maxWidth: '440px',
+                aspectRatio: '1/1'
+              }}
+            >
+              {Array.from({ length: currentLevel.gridSize }).map((_, r) =>
+                Array.from({ length: currentLevel.gridSize }).map((_, c) => {
+                  const cellKey = `${r}-${c}`;
+                  const char = gridState[cellKey];
+                  const startInfo = wordMap[cellKey];
+
+                  return (
+                    <button
+                      key={cellKey}
+                      onClick={() => handleCellClick(r, c)}
+                      className={`relative rounded-lg flex items-center justify-center font-bold text-xl transition-all duration-150 select-none aspect-square w-full h-full p-0 overflow-hidden ${
+                        char
+                          ? 'wood-tile shadow-md cursor-pointer'
+                          : 'empty-cell border cursor-pointer'
+                      }`}
+                    >
+                      {/* Ge'ez Clue Number Badge */}
+                      {startInfo && (
+                        <span className="absolute top-0.5 left-1 text-[13px] text-amber-400 font-extrabold leading-none z-10 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] opacity-100">
+                          {toGeezNumber(startInfo.clueNum)}
+                        </span>
+                      )}
+
+                      {/* Placed Character */}
+                      {char && <span>{char}</span>}
+
+                      {/* Subscript Points */}
+                      {char && (
+                        <span className="absolute bottom-0.5 right-1 text-[9px] text-[#5c3a17] font-semibold">
+                          {getLetterPoints(char)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
             </div>
-          </div>
 
-        </section>
-
-        {/* Right Column: Clues / Definitions & Progression */}
-        <section className="md:col-span-5 flex flex-col space-y-4">
-
-          {/* Definitions / Clues Card */}
-          <div className="card-bg rounded-xl border p-4 shadow-lg flex-1 flex flex-col">
-            <div className="flex items-center justify-between border-b border-amber-800/30 pb-2 mb-3">
-              <div className="flex items-center space-x-2 text-amber-500 font-semibold">
-                <BookOpen className="w-5 h-5 text-amber-500" />
-                <span>ጥቆማዎችና ትርጓሜዎች (Clues)</span>
+            {/* Tile Rack */}
+            <div className="w-full card-bg p-4 rounded-xl border shadow-lg flex flex-col items-center space-y-2">
+              <span className="text-xs opacity-80 font-medium">የፊደላት ሳጥን (Tile Rack) - ለማስቀመጥ ጠቅ ያድርጉ</span>
+              <div className="flex flex-wrap justify-center gap-2">
+                {rackTiles.map((tile, idx) => {
+                  const isSelected = selectedRackTile?.index === idx;
+                  return (
+                    <button
+                      key={tile.id}
+                      onClick={() =>
+                        setSelectedRackTile(isSelected ? null : { char: tile.char, index: idx })
+                      }
+                      className={`w-11 h-11 wood-tile rounded-lg font-bold text-xl flex items-center justify-center relative transition transform cursor-pointer ${
+                        isSelected ? 'ring-4 ring-amber-400 -translate-y-2 scale-105' : 'hover:-translate-y-1'
+                      }`}
+                    >
+                      <span>{tile.char}</span>
+                      <span className="absolute bottom-0.5 right-1 text-[9px] text-[#5c3a17]">
+                        {getLetterPoints(tile.char)}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="space-y-3 overflow-y-auto max-h-[400px] pr-1">
-              {currentLevel.words.map((w: WordEntry) => {
-                const isSolved = checkWordSolved(w, gridState);
-                const startCellKey = `${w.startRow}-${w.startCol}`;
-                const clueNum = wordMap[startCellKey]?.clueNum || 1;
+          </section>
 
-                return (
-                  <div
-                    key={w.id}
-                    className={`p-3 rounded-lg border transition ${
-                      isSolved
-                        ? 'bg-emerald-900/30 border-emerald-600/50 text-emerald-400'
-                        : 'clue-card'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="bg-amber-800/60 text-amber-200 text-xs font-bold px-2 py-0.5 rounded">
-                          {toGeezNumber(clueNum)} ({w.direction === 'across' ? 'አግድም' : 'ቁልቁል'})
-                        </span>
-                        {w.category && (
-                          <span className="text-[10px] bg-[#33281d] text-amber-500/80 px-1.5 py-0.5 rounded border border-[#453728]">
-                            {w.category}
+          {/* Right Column: Clues / Definitions & Progression */}
+          <section className="md:col-span-5 flex flex-col space-y-4">
+
+            {/* Definitions / Clues Card */}
+            <div className="card-bg rounded-xl border p-4 shadow-lg flex-1 flex flex-col">
+              <div className="flex items-center justify-between border-b border-amber-800/30 pb-2 mb-3">
+                <div className="flex items-center space-x-2 text-amber-500 font-semibold">
+                  <BookOpen className="w-5 h-5 text-amber-500" />
+                  <span>ጥቆማዎችና ትርጓሜዎች (Clues)</span>
+                </div>
+              </div>
+
+              <div className="space-y-3 overflow-y-auto max-h-[400px] pr-1">
+                {currentLevel.words.map((w: WordEntry) => {
+                  const isSolved = checkWordSolved(w, gridState);
+                  const startCellKey = `${w.startRow}-${w.startCol}`;
+                  const clueNum = wordMap[startCellKey]?.clueNum || 1;
+
+                  return (
+                    <div
+                      key={w.id}
+                      className={`p-3 rounded-lg border transition ${
+                        isSolved
+                          ? 'bg-emerald-900/30 border-emerald-600/50 text-emerald-400'
+                          : 'clue-card'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="bg-amber-800/60 text-amber-200 text-xs font-bold px-2 py-0.5 rounded">
+                            {toGeezNumber(clueNum)} ({w.direction === 'across' ? 'አግድም' : 'ቁልቁል'})
                           </span>
+                          {w.category && (
+                            <span className="text-[10px] bg-[#33281d] text-amber-500/80 px-1.5 py-0.5 rounded border border-[#453728]">
+                              {w.category}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Reveal Button */}
+                        {!isSolved && (
+                          <button
+                            onClick={() => handleRevealWord(w)}
+                            className="flex items-center space-x-1 text-[11px] bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 px-2 py-1 rounded border border-amber-600/40 transition cursor-pointer"
+                            title="መልስ ተመልከት (5 ቶከን)"
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span>መልስ (፭ ቶከን)</span>
+                          </button>
                         )}
                       </div>
 
-                      {/* Reveal Button */}
-                      {!isSolved && (
-                        <button
-                          onClick={() => handleRevealWord(w)}
-                          className="flex items-center space-x-1 text-[11px] bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 px-2 py-1 rounded border border-amber-600/40 transition cursor-pointer"
-                          title="መልስ ተመልከት (5 ቶከን)"
-                        >
-                          <Eye className="w-3 h-3" />
-                          <span>መልስ (፭ ቶከን)</span>
-                        </button>
+                      <p className="text-sm mt-2 font-medium">{w.clue}</p>
+
+                      {isSolved && (
+                        <div className="mt-2 text-xs text-emerald-400 font-bold flex items-center space-x-1">
+                          <span>✓ ተመልሷል: {w.word}</span>
+                        </div>
                       )}
                     </div>
-
-                    <p className="text-sm mt-2 font-medium">{w.clue}</p>
-
-                    {isSolved && (
-                      <div className="mt-2 text-xs text-emerald-400 font-bold flex items-center space-x-1">
-                        <span>✓ ተመልሷል: {w.word}</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
 
-          {/* Level Switcher */}
-          <div className="card-bg p-3 rounded-xl border flex items-center justify-between">
-            <span className="text-xs opacity-80 font-medium">ደረጃዎች (Levels)</span>
-            <div className="flex space-x-2">
-              {LEVELS.map((lvl, idx: number) => (
-                <button
-                  key={lvl.levelNumber}
-                  onClick={() => setCurrentLevelIdx(idx)}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    currentLevelIdx === idx
-                      ? 'bg-amber-600 text-white shadow'
-                      : 'stat-badge border text-amber-500 hover:bg-amber-600/20'
-                  }`}
-                >
-                  {toGeezNumber(lvl.levelNumber)}
-                </button>
-              ))}
+            {/* Level Switcher */}
+            <div className="card-bg p-3 rounded-xl border flex items-center justify-between">
+              <span className="text-xs opacity-80 font-medium">ደረጃዎች (Levels)</span>
+              <div className="flex flex-wrap gap-2">
+                {levelList.map((lvl, idx: number) => (
+                  <button
+                    key={lvl.levelNumber}
+                    onClick={() => setCurrentLevelIdx(idx)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      currentLevelIdx === idx
+                        ? 'bg-amber-600 text-white shadow'
+                        : 'stat-badge border text-amber-500 hover:bg-amber-600/20'
+                    }`}
+                  >
+                    {toGeezNumber(lvl.levelNumber)}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-        </section>
-      </main>
+          </section>
+        </main>
+      )}
 
       {/* Rules Modal */}
       {showRulesModal && (
@@ -427,16 +476,9 @@ export function App() {
               </div>
 
               <div className="clue-card p-3 rounded-lg border">
-                <h4 className="font-bold text-amber-500 mb-1">፪. የግዕዝ ቁጥሮች (Ge'ez Numerals)</h4>
+                <h4 className="font-bold text-amber-500 mb-1">፬. የሰሪው ሁነታ (Dev Mode - Level Builder)</h4>
                 <p className="text-xs">
-                  የጨዋታው ነጥቦች፣ የቶከን ብዛት እና ጥቆማዎች በግዕዝ ቁጥሮች (፩, ፪, ፫, ፬...) ይገለጻሉ።
-                </p>
-              </div>
-
-              <div className="clue-card p-3 rounded-lg border">
-                <h4 className="font-bold text-amber-500 mb-1">፫. ጥቆማዎች እና ቶከን (Hints & Tokens)</h4>
-                <p className="text-xs">
-                  ቃላትን ማግኘት ካልቻሉ ፭ ቶከን በመጠቀም መልሱን ማየት ይችላሉ። ደረጃዎችን ሲያጠናቅቁ ተጨማሪ ቶከን ያገኛሉ።
+                  በላይኛው ጥግ የሚገኘውን "የሰሪው ሁነታ (Dev Mode)" በመጫን አዳዲስ ደረጃዎችን፣ ቃላትን እና ጥቆማዎችን በሰሌዳው ላይ ማስቀመጥ እና በቀጥታ መሞከር ይችላሉ።
                 </p>
               </div>
             </div>
@@ -475,13 +517,13 @@ export function App() {
             <button
               onClick={() => {
                 setShowLevelSuccessModal(false);
-                if (currentLevelIdx < LEVELS.length - 1) {
+                if (currentLevelIdx < levelList.length - 1) {
                   setCurrentLevelIdx((prev) => prev + 1);
                 }
               }}
               className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 font-bold rounded-xl text-white flex items-center justify-center space-x-2 transition cursor-pointer"
             >
-              <span>{currentLevelIdx < LEVELS.length - 1 ? 'ወደ ሚቀጥለው ደረጃ (Next Level)' : 'ደረጃውን አጠናቅቀዋል! (Done)'}</span>
+              <span>{currentLevelIdx < levelList.length - 1 ? 'ወደ ሚቀጥለው ደረጃ (Next Level)' : 'ደረጃውን አጠናቅቀዋል! (Done)'}</span>
               <ChevronRight className="w-5 h-5" />
             </button>
           </div>
