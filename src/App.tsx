@@ -45,19 +45,6 @@ export function App() {
     setRackTiles(levelRack);
   }, [currentLevelIdx, currentLevel]);
 
-  // Set of all active (playable word) cell keys in current level grid
-  const activeCells = React.useMemo(() => {
-    const set = new Set<string>();
-    currentLevel.words.forEach((w: WordEntry) => {
-      for (let i = 0; i < w.word.length; i++) {
-        const r = w.direction === 'across' ? w.startRow : w.startRow + i;
-        const c = w.direction === 'across' ? w.startCol + i : w.startCol;
-        set.add(`${r}-${c}`);
-      }
-    });
-    return set;
-  }, [currentLevel]);
-
   // Compute cell clue numbers and starting positions
   const wordMap = React.useMemo(() => {
     const map: Record<string, { clueNum: number; words: WordEntry[] }> = {};
@@ -130,6 +117,13 @@ export function App() {
       const newGrid = { ...gridState };
       delete newGrid[cellKey];
       setGridState(newGrid);
+    } else if (rackTiles.length > 0) {
+      // Single click placement: if player clicks an empty cell without selecting a rack tile first, place first available tile from rack
+      const firstTile = rackTiles[0];
+      const newGrid = { ...gridState, [cellKey]: firstTile.char };
+      setGridState(newGrid);
+      setScore((prev) => prev + getLetterPoints(firstTile.char));
+      setRackTiles((prev) => prev.slice(1));
     }
   };
 
@@ -264,19 +258,8 @@ export function App() {
             {Array.from({ length: currentLevel.gridSize }).map((_, r) =>
               Array.from({ length: currentLevel.gridSize }).map((_, c) => {
                 const cellKey = `${r}-${c}`;
-                const isActive = activeCells.has(cellKey);
                 const char = gridState[cellKey];
                 const startInfo = wordMap[cellKey];
-
-                if (!isActive) {
-                  return (
-                    <div
-                      key={cellKey}
-                      className="wooden-wall-block rounded-lg aspect-square w-full h-full"
-                      aria-hidden="true"
-                    />
-                  );
-                }
 
                 return (
                   <button
@@ -285,7 +268,7 @@ export function App() {
                     className={`relative rounded-lg flex items-center justify-center font-bold text-xl transition-all duration-150 select-none aspect-square w-full h-full p-0 overflow-hidden ${
                       char
                         ? 'wood-tile shadow-md cursor-pointer'
-                        : 'empty-cell border'
+                        : 'empty-cell border cursor-pointer'
                     }`}
                   >
                     {/* Ge'ez Clue Number Badge */}
